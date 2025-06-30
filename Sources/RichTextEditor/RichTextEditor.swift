@@ -90,4 +90,17 @@ public class RichTextEditorView: UIView {
         }
         return nil
     }
+    
+    // 1️⃣ A small list‑style enum
+    public enum ListStyle { case unordered, ordered }
+
+    // 2️⃣ The list formatter
+    public func applyListStyle(_ style: ListStyle) {
+        guard let selectedRange = textView.selectedTextRange else { return }
+        // For demo purposes we’ll prepend • or 1. – production code would
+        // iterate line‑by‑line and preserve numbering.
+        let prefix = (style == .unordered) ? "• " : "1. "
+        textView.replace(selectedRange, withText: prefix + textView.text(in: selectedRange)!)
+    }
+
 }
