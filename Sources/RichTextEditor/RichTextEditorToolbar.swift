@@ -44,7 +44,8 @@ public final class RichTextEditorToolbar: UIToolbar {
             makeItem(symbol: "list.number", selector: #selector(numberTapped))
         ]
         setItems(items, animated: false)
-        sizeToFit()               // gives intrinsic height
+        sizeToFit()               // gives intrinsic height'
+        print("Toolbar items: \(items)")
     }
 
     private var flexible: UIBarButtonItem { .init(barButtonSystemItem: .flexibleSpace,
