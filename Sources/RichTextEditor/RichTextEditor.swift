@@ -6,6 +6,20 @@ import UIKit
 public class RichTextEditorView: UIView {
 
     public let textView = UITextView()
+    public var currentTextColor: UIColor {
+        // 1. If the user has already set a typing color, return it.
+        if let color = textView.typingAttributes[.foregroundColor] as? UIColor {
+            return color
+        }
+
+        // 2. Otherwise, fall back to a sensible default that exists on every OS.
+        if #available(iOS 13, *) {
+            return .label        // dynamic black/white on iOS 13+
+        } else {
+            return .black        // static black on iOS 12 or earlier
+        }
+    }
+
 
     public override init(frame: CGRect) {
         super.init(frame: frame)

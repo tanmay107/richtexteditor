@@ -106,35 +106,26 @@ public final class RichTextEditorToolbar: UIToolbar {
     @objc private func colorTapped() {
         guard let vc = editor?.findOwningViewController() else { return }
 
-        let alert = UIAlertController(title: "Text Color",
-                                      message: nil,
-                                      preferredStyle: .actionSheet)
+        // iOS 14+ → use native color picker
+        if #available(iOS 14, *) {
+            let picker = UIColorPickerViewController()
+            picker.supportsAlpha = true                         // let users choose transparency
+            picker.selectedColor = editor?.currentTextColor ?? .label
+            picker.delegate = self                              // we’ll add conformance below
+            vc.present(picker, animated: true)
+            return
+        }
 
-        // 1️⃣ Build the palette
-        var palette: [(String, UIColor)] = [
-            ("Red",    .systemRed),
-            ("Blue",   .systemBlue),
-            ("Green",  .systemGreen),
-            ("Orange", .systemOrange)
-        ]
-
-        // Add a label‑adaptive entry if the OS supports it
+        // iOS 13 → keep the small preset palette
         if #available(iOS 13, *) {
-            palette.append(("Black/White", .label))     // dynamic
-        } else {
-            palette.append(("Black", .black))           // static fallback
+            presentPresetPalette(on: vc)
+            return
         }
 
-        // 2️⃣ Add actions
-        for (name, color) in palette {
-            alert.addAction(UIAlertAction(title: name, style: .default) { _ in
-                self.editor?.applyTextColor(color)
-            })
-        }
-
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        vc.present(alert, animated: true)
+        // iOS 12 and below → very simple RGB sliders
+        presentLegacyRGBSliders(on: vc)
     }
+
 
     @objc private func fontTapped() {
         guard let vc = editor?.findOwningViewController() else { return }
@@ -172,6 +163,57 @@ public final class RichTextEditorToolbar: UIToolbar {
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         vc.present(alert, animated: true)
     }
+    
+    private func presentPresetPalette(on vc: UIViewController) {
+        let alert = UIAlertController(title: "Text Color", message: nil, preferredStyle: .actionSheet)
+
+        var colors: [(String, UIColor)] = [
+            ("Red", .systemRed),
+            ("Blue", .systemBlue),
+            ("Green", .systemGreen),
+            ("Orange", .systemOrange)
+        ]
+
+        // Add a safe default for "Black" or dynamic "Black/White"
+        if #available(iOS 13, *) {
+            colors.append(("Black/White", .label))  // dynamic color
+        } else {
+            colors.append(("Black", .black))        // fallback
+        }
+
+        colors.forEach { name, color in
+            alert.addAction(UIAlertAction(title: name, style: .default) { _ in
+                self.editor?.applyTextColor(color)
+            })
+        }
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        vc.present(alert, animated: true)
+    }
+
+    private func presentLegacyRGBSliders(on vc: UIViewController) {
+        let alert = UIAlertController(title: "Text Color (RGB 0‑255)", message: nil, preferredStyle: .alert)
+        ["R", "G", "B"].forEach { placeholder in
+            alert.addTextField {
+                $0.placeholder = placeholder
+                $0.keyboardType = .numberPad
+            }
+        }
+        alert.addAction(UIAlertAction(title: "Apply", style: .default) { _ in
+            guard let rgb = alert.textFields?.compactMap { Int($0.text ?? "") }.prefix(3) else {
+                return
+            }
+            guard rgb.count == 3 else { return }
+            let color = UIColor(red: CGFloat(rgb[0])/255.0,
+                                green: CGFloat(rgb[1])/255.0,
+                                blue: CGFloat(rgb[2])/255.0,
+                                alpha: 1)
+            self.editor?.applyTextColor(color)
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        vc.present(alert, animated: true)
+    }
+
 
 }
 
@@ -187,4 +229,17 @@ extension UIView {
         return nil
     }
 }
+
+@available(iOS 14, *)
+extension RichTextEditorToolbar: UIColorPickerViewControllerDelegate {
+    public func colorPickerViewControllerDidFinish(_ viewController: UIColorPickerViewController) {
+        editor?.applyTextColor(viewController.selectedColor)
+    }
+
+    public func colorPickerViewControllerDidSelectColor(_ viewController: UIColorPickerViewController) {
+        // Live preview while user drags the wheel (optional)
+        editor?.applyTextColor(viewController.selectedColor)
+    }
+}
+
 
