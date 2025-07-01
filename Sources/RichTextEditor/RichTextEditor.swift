@@ -158,6 +158,36 @@ public class RichTextEditorView: UIView {
         textView.selectedRange  = NSRange(location: newSelectedLocation,
                                           length: newSelectedLength)
     }
+    
+    public func applyTextColor(_ color: UIColor) {
+        guard let range = textView.selectedTextRange else { return }
+        let nsRange = textView.selectedRange
+
+        textView.textStorage.addAttribute(.foregroundColor, value: color, range: nsRange)
+        textView.typingAttributes[.foregroundColor] = color
+    }
+
+    public func applyFont(named name: String) {
+        guard let range = textView.selectedTextRange else { return }
+        guard let font = UIFont(name: name, size: textView.font?.pointSize ?? 16) else { return }
+
+        let nsRange = textView.selectedRange
+        textView.textStorage.addAttribute(.font, value: font, range: nsRange)
+        textView.typingAttributes[.font] = font
+    }
+
+    public func applyLink(_ url: URL) {
+        let nsRange = textView.selectedRange
+        textView.textStorage.addAttribute(.link, value: url, range: nsRange)
+        textView.typingAttributes[.link] = url
+    }
+
+    public func removeLink() {
+        let nsRange = textView.selectedRange
+        textView.textStorage.removeAttribute(.link, range: nsRange)
+        textView.typingAttributes.removeValue(forKey: .link)
+    }
+
 
 
 }
