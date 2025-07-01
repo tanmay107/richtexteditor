@@ -96,11 +96,67 @@ public class RichTextEditorView: UIView {
 
     // 2️⃣ The list formatter
     public func applyListStyle(_ style: ListStyle) {
-        guard let selectedRange = textView.selectedTextRange else { return }
-        // For demo purposes we’ll prepend • or 1. – production code would
-        // iterate line‑by‑line and preserve numbering.
-        let prefix = (style == .unordered) ? "• " : "1. "
-        textView.replace(selectedRange, withText: prefix + textView.text(in: selectedRange)!)
+
+        // 1⃣ Grab the range that should be affected — full paragraphs of the selection
+        let fullText     = textView.textStorage            // NSAttributedString
+        let selectedNS   = textView.selectedRange          // NSRange
+        let paraRange    = (fullText.string as NSString)
+                            .paragraphRange(for: selectedNS)
+
+        // 2⃣ Split the affected substring into individual lines
+        let original     = (fullText.string as NSString)
+                            .substring(with: paraRange)
+        var lines        = original.components(separatedBy: "\n")
+
+        // 3⃣ Build the new lines
+        var newLines: [String] = []
+        var number = 1
+        for line in lines {
+
+            // Trim leading spaces so we can reliably detect existing bullets
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            switch style {
+
+            case .unordered:
+                if trimmed.hasPrefix("• ") {
+                    newLines.append(line)                // already bulleted
+                } else {
+                    newLines.append("• " + line)
+                }
+
+            case .ordered:
+                let regex  = try! NSRegularExpression(pattern: #"^\d+\.\s"#)
+                if regex.firstMatch(in: trimmed,
+                                    range: NSRange(location: 0,
+                                                   length: trimmed.utf16.count)) != nil {
+                    newLines.append(line)                // already numbered
+                } else {
+                    newLines.append("\(number). " + line)
+                }
+                number += 1
+            }
+        }
+
+        let replacement = newLines.joined(separator: "\n")
+
+        // 4⃣ Apply replacement—preserve attributes by going through textStorage
+        textView.textStorage.beginEditing()
+        let attrReplacement = NSMutableAttributedString(string: replacement)
+
+        // Copy base typing attributes into the replacement so new text blends in
+        attrReplacement.addAttributes(textView.typingAttributes,
+                                      range: NSRange(location: 0,
+                                                     length: attrReplacement.length))
+
+        textView.textStorage.replaceCharacters(in: paraRange, with: attrReplacement)
+        textView.textStorage.endEditing()
+
+        // 5⃣ Restore selection relative to new text
+        let newSelectedLocation = paraRange.location
+        let newSelectedLength   = attrReplacement.length
+        textView.selectedRange  = NSRange(location: newSelectedLocation,
+                                          length: newSelectedLength)
     }
+
 
 }
