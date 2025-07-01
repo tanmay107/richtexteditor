@@ -54,6 +54,7 @@ public final class RichTextEditorToolbar: UIToolbar {
 
     private func makeItem(symbol: String, selector: Selector) -> UIBarButtonItem {
         let image = UIImage(named: symbol)
+        print("SF Symbol '\(symbol)' found? -> \(image != nil)")
         let item  = UIBarButtonItem(image: image,
                                     style: .plain,
                                     target: self,
