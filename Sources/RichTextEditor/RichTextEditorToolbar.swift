@@ -97,3 +97,4 @@ public final class RichTextEditorToolbar: UIToolbar {
         editor?.applyListStyle(.ordered)
     }
 }
+
