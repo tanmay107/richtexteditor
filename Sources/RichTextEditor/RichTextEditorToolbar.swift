@@ -52,18 +52,36 @@ public final class RichTextEditorToolbar: UIToolbar {
                                                    target: nil,
                                                    action: nil) }
 
-    private func makeItem(symbol: String, selector: Selector) -> UIBarButtonItem {
-        let image = UIImage(named: symbol)
-        print("SF Symbol '\(symbol)' found? -> \(image != nil)")
-        let item  = UIBarButtonItem(image: image,
-                                    style: .plain,
-                                    target: self,
-                                    action: selector)
-        if showsTextLabels {
-            item.title = symbol.capitalized
+    private func makeItem(symbol: String,
+                          fallbackAsset: String? = nil,
+                          selector: Selector) -> UIBarButtonItem {
+
+        // 1️⃣ Try to load an SF Symbol (iOS 13+)
+        let sfImage: UIImage? = {
+            if #available(iOS 13, *) {
+                return UIImage(systemName: symbol)
+            }
+            return nil
+        }()
+
+        // 2️⃣ If that failed (pre‑iOS13 **or** unknown symbol), use fallback asset if provided
+        let img = sfImage ?? (fallbackAsset.flatMap { UIImage(named: $0) })
+
+        // 3️⃣ If still nil, fall back to a 1‑character title so the button remains tappable
+        if let img = img {
+            return UIBarButtonItem(image: img,
+                                   style: .plain,
+                                   target: self,
+                                   action: selector)
+        } else {
+            // Title will be first letter capitalized (“B”, “I”, etc.)
+            return UIBarButtonItem(title: String(symbol.prefix(1)).uppercased(),
+                                   style: .plain,
+                                   target: self,
+                                   action: selector)
         }
-        return item
     }
+
 
     // MARK: Actions
 
