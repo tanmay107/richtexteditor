@@ -190,28 +190,11 @@ public class RichTextEditorView: UIView {
         textView.typingAttributes[.font] = font
     }
 
-    public func applyLink(_ url: URL, color: UIColor? = nil) {
-        let range = textView.selectedRange
-        let linkColor: UIColor = {
-            if let c = color { return c }
-            if #available(iOS 13, *) { return .link }   // dynamic blue
-            else { return .blue }                      // static blue on iOS 12‑
-        }()
-
-        // 1. Remove any existing foreground colour so ours isn’t overridden.
-        textView.textStorage.removeAttribute(.foregroundColor, range: range)
-
-        // 2. Add link and colour.
-        textView.textStorage.addAttributes([
-            .link: url,
-            .foregroundColor: linkColor
-        ], range: range)
-
-        // 3. Keep typing attributes in sync for new text typed right after.
-        textView.typingAttributes[.link]            = url
-        textView.typingAttributes[.foregroundColor] = linkColor
+    public func applyLink(_ url: URL) {
+        let nsRange = textView.selectedRange
+        textView.textStorage.addAttribute(.link, value: url, range: nsRange)
+        textView.typingAttributes[.link] = url
     }
-
 
     public func removeLink() {
         let nsRange = textView.selectedRange
