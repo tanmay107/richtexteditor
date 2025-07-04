@@ -44,6 +44,11 @@ public final class RichTextEditorToolbar: UIToolbar {
             makeItem(symbol: "list.bullet", selector: #selector(bulletTapped)),
             makeItem(symbol: "list.number", selector: #selector(numberTapped)),
             flexible,
+            
+            makeItem(symbol: "text.alignleft", selector: #selector(alignLeftTapped)),
+            makeItem(symbol: "text.aligncenter", selector: #selector(alignCenterTapped)),
+            makeItem(symbol: "text.alignright", selector: #selector(alignRightTapped)),
+            flexible,
 
             makeItem(symbol: "paintpalette", selector: #selector(colorTapped)),  // 🎨 color
             makeItem(symbol: "textformat", selector: #selector(fontTapped)),     // 🔤 font
@@ -101,6 +106,18 @@ public final class RichTextEditorToolbar: UIToolbar {
 
     @objc private func numberTapped() {
         editor?.applyListStyle(.ordered)
+    }
+    
+    @objc private func alignLeftTapped() {
+        editor?.applyTextAlignment(.left)
+    }
+
+    @objc private func alignCenterTapped() {
+        editor?.applyTextAlignment(.center)
+    }
+
+    @objc private func alignRightTapped() {
+        editor?.applyTextAlignment(.right)
     }
     
     @objc private func colorTapped() {

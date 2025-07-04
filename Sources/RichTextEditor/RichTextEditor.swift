@@ -36,6 +36,7 @@ public class RichTextEditorView: UIView {
         textView.delegate = self
         textView.isEditable = true
         textView.isScrollEnabled = true
+        textView.alwaysBounceVertical = true
         textView.font = UIFont.systemFont(ofSize: 16)
         addSubview(textView)
 
@@ -201,9 +202,28 @@ public class RichTextEditorView: UIView {
         textView.textStorage.removeAttribute(.link, range: nsRange)
         textView.typingAttributes.removeValue(forKey: .link)
     }
+    
+    public func applyTextAlignment(_ alignment: NSTextAlignment) {
+        let selectedRange = textView.selectedRange
 
+        // Apply alignment to entire paragraph range
+        let fullText = textView.attributedText.mutableCopy() as! NSMutableAttributedString
+        let paragraphRange = (fullText.string as NSString).paragraphRange(for: selectedRange)
 
+        fullText.enumerateAttribute(.paragraphStyle, in: paragraphRange, options: []) { value, range, _ in
+            let mutableStyle = (value as? NSMutableParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+            mutableStyle.alignment = alignment
+            fullText.addAttribute(.paragraphStyle, value: mutableStyle, range: range)
+        }
 
+        textView.attributedText = fullText
+        textView.selectedRange = selectedRange  // Preserve cursor position
+
+        // Also update typingAttributes so new text stays aligned
+        let style = NSMutableParagraphStyle()
+        style.alignment = alignment
+        textView.typingAttributes[.paragraphStyle] = style
+    }
 }
 
 extension RichTextEditorView: UITextViewDelegate {
