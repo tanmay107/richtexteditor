@@ -107,6 +107,34 @@ public class RichTextEditorView: UIView {
         return nil
     }
     
+    public func getFormattedString() -> String {
+        guard let attributed = textView.attributedText else {
+            return ""
+        }
+        var result = ""
+        var listIndex = 1
+
+        attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attrs, range, _ in
+            var line = attributed.attributedSubstring(from: range).string
+
+            if let para = attrs[.paragraphStyle] as? NSParagraphStyle,
+               let textList = para.textLists.first {
+                
+                // Generate the bullet or number prefix
+                let marker = textList.marker(forItemNumber: listIndex)
+                line = "\(marker) \(line)"
+                listIndex += 1
+            } else {
+                listIndex = 1  // reset when not in a list
+            }
+
+            result += line
+        }
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    
     // 1️⃣ A small list‑style enum
     public enum ListStyle { case unordered, ordered }
 
