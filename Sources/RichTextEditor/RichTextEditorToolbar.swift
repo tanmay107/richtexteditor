@@ -51,7 +51,7 @@ public final class RichTextEditorToolbar: UIToolbar {
             flexible,
 
             makeItem(symbol: "paintpalette", selector: #selector(colorTapped)),  // 🎨 color
-            makeItem(symbol: "textformat", selector: #selector(fontTapped)),     // 🔤 font
+//            makeItem(symbol: "textformat", selector: #selector(fontTapped)),     // 🔤 font
             makeItem(symbol: "link", selector: #selector(linkTapped))            // 🔗 link
         ]
         setItems(items, animated: false)
