@@ -98,7 +98,7 @@ public class RichTextEditorView: UIView {
         }
     }
 
-    public func getHTMLBodyWrapped() -> String? {
+    public func getHTML() -> String? {
         let range = NSRange(location: 0, length: textView.attributedText.length)
         if let data = try? textView.attributedText.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.html]),
            let htmlString = String(data: data, encoding: .utf8) {
