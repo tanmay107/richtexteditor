@@ -98,11 +98,21 @@ public class RichTextEditorView: UIView {
         }
     }
 
-    public func getHTML() -> String? {
+    public func getHTMLBodyWrapped() -> String? {
         let range = NSRange(location: 0, length: textView.attributedText.length)
-        if let data = try? textView.attributedText.data(from: range,
-                                                        documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
-            return String(data: data, encoding: .utf8)
+        if let data = try? textView.attributedText.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.html]),
+           let htmlString = String(data: data, encoding: .utf8) {
+            
+            // Extract only what's inside <body>…</body>
+            if let bodyRange = htmlString.range(of: "<body[^>]*>(.*?)</body>", options: .regularExpression) {
+                let bodyContents = String(htmlString[bodyRange])
+                    .replacingOccurrences(of: "<body[^>]*>", with: "", options: .regularExpression)
+                    .replacingOccurrences(of: "</body>", with: "")
+                
+                return "<html>\n<body>\n\(bodyContents)\n</body>\n</html>"
+            } else {
+                return "<html>\n<body>\n\(htmlString)\n</body>\n</html>"
+            }
         }
         return nil
     }
