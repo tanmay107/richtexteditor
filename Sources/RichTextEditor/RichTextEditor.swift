@@ -100,22 +100,30 @@ public class RichTextEditorView: UIView {
 
     public func getHTML() -> String? {
         let range = NSRange(location: 0, length: textView.attributedText.length)
-        if let data = try? textView.attributedText.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.html]),
-           let htmlString = String(data: data, encoding: .utf8) {
-            
-            // Extract only what's inside <body>…</body>
-            if let bodyRange = htmlString.range(of: "<body[^>]*>(.*?)</body>", options: .regularExpression) {
-                let bodyContents = String(htmlString[bodyRange])
-                    .replacingOccurrences(of: "<body[^>]*>", with: "", options: .regularExpression)
-                    .replacingOccurrences(of: "</body>", with: "")
-                
-                return "<html>\n<body>\n\(bodyContents)\n</body>\n</html>"
-            } else {
-                return "<html>\n<body>\n\(htmlString)\n</body>\n</html>"
-            }
+        if let data = try? textView.attributedText.data(from: range,
+                                                        documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
+            return String(data: data, encoding: .utf8)
         }
         return nil
     }
+    
+    public func getBodyOnlyHTML() -> String? {
+        guard let fullHTML = getHTML() else { return nil }
+        
+        // Simple regex: captures everything from <html>... including <body>...</body> up to </html>
+        let pattern = "(?s)<html.*?>(.*?)</html>"
+        
+        if let regex = try? NSRegularExpression(pattern: pattern, options: []),
+           let match = regex.firstMatch(in: fullHTML, options: [], range: NSRange(location: 0, length: fullHTML.utf16.count)),
+           let range = Range(match.range(at: 1), in: fullHTML) {
+            
+            let bodyOnlyHTML = String(fullHTML[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return "<html>\n\(bodyOnlyHTML)\n</html>"
+        }
+        
+        return nil
+    }
+
     
     public func getFormattedString() -> String {
         guard let attributed = textView.attributedText else {
