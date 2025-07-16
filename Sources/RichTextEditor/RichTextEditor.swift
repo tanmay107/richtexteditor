@@ -111,7 +111,7 @@ public class RichTextEditorView: UIView {
         guard let fullHTML = getHTML() else { return nil }
         
         // Simple regex: captures everything from <html>... including <body>...</body> up to </html>
-        let pattern = "(?s)<body.*?>(.*?)</body>"
+        let pattern = "(?s)<html.*?>(.*?)</html>"
         
         if let regex = try? NSRegularExpression(pattern: pattern, options: []),
            let match = regex.firstMatch(in: fullHTML, options: [], range: NSRange(location: 0, length: fullHTML.utf16.count)),
