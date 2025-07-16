@@ -110,14 +110,15 @@ public class RichTextEditorView: UIView {
     public func getBodyOnlyHTML() -> String? {
         guard let fullHTML = getHTML() else { return nil }
         
+        // Simple regex: captures everything from <html>... including <body>...</body> up to </html>
         let pattern = "(?s)<body.*?>(.*?)</body>"
         
-        if let regex = try? NSRegularExpression(pattern: pattern),
+        if let regex = try? NSRegularExpression(pattern: pattern, options: []),
            let match = regex.firstMatch(in: fullHTML, options: [], range: NSRange(location: 0, length: fullHTML.utf16.count)),
            let range = Range(match.range(at: 1), in: fullHTML) {
             
-            let bodyOnlyContent = String(fullHTML[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-            return "<html>\n<body>\n\(bodyOnlyContent)\n</body>\n</html>"
+            let bodyOnlyHTML = String(fullHTML[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return "<html>\n\(bodyOnlyHTML)\n</html>"
         }
         
         return nil
