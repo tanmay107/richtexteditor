@@ -127,17 +127,18 @@ public class RichTextEditorView: UIView {
     public func getXHTML() -> String? {
         guard var html = getBodyOnlyHTML() else { return nil }
 
-        // Self-close <meta> tags if not already closed
-        let metaPattern = "<meta([^>/]*)(?<!/)>"
+        // Remove all <meta ...> tags using regex
+        let metaPattern = "<meta[^>]*>"
         if let regex = try? NSRegularExpression(pattern: metaPattern, options: [.caseInsensitive]) {
-            html = regex.stringByReplacingMatches(in: html, options: [], range: NSRange(location: 0, length: html.utf16.count), withTemplate: "<meta$1 />")
+            let range = NSRange(location: 0, length: html.utf16.count)
+            html = regex.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
         }
 
-        // Self-close <br> and <hr> as well
+        // Replace self-closing tags
         html = html.replacingOccurrences(of: "<br>", with: "<br />")
         html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
 
-        // Add XML header and XHTML namespace manually
+        // Add XML header and XHTML namespace
         if html.contains("<html") {
             html = """
             <?xml version="1.0" encoding="UTF-8"?>\n
@@ -147,6 +148,7 @@ public class RichTextEditorView: UIView {
 
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
 
 
     
