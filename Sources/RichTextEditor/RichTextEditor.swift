@@ -177,9 +177,72 @@ public class RichTextEditorView: UIView {
 
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    
+    public func generateFullyInlineStyledHTML() -> String {
+        let fullRange = NSRange(location: 0, length: textView.attributedText.length)
+        let attributed = textView.attributedText!
 
+        var htmlBody = ""
 
+        attributed.enumerateAttributes(in: fullRange, options: []) { attributes, range, _ in
+            let substring = attributed.attributedSubstring(from: range).string
+                .replacingOccurrences(of: "\n", with: "<br />")
 
+            var styleString = ""
+
+            if let font = attributes[.font] as? UIFont {
+                styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px; "
+                if font.fontDescriptor.symbolicTraits.contains(.traitBold) {
+                    styleString += "font-weight: bold; "
+                }
+                if font.fontDescriptor.symbolicTraits.contains(.traitItalic) {
+                    styleString += "font-style: italic; "
+                }
+            }
+
+            if let color = attributes[.foregroundColor] as? UIColor {
+                styleString += "color: \(color.hexString); "
+            }
+
+            if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
+                switch paragraph.alignment {
+                case .center: styleString += "text-align: center; "
+                case .right: styleString += "text-align: right; "
+                default: break
+                }
+            }
+
+            if attributes[.underlineStyle] != nil {
+                htmlBody += "<span style=\"\(styleString) text-decoration: underline;\">\(substring)</span>"
+            } else {
+                htmlBody += "<span style=\"\(styleString)\">\(substring)</span>"
+            }
+        }
+
+        let result = """
+        <html>
+        <body>\(htmlBody)</body>
+        </html>
+        """
+        return result
+    }
+
+    
+    public func convertCSSClassesToInlineStyles(html: String, styles: [String: String]) -> String {
+        var result = html
+
+        for (className, style) in styles {
+            let escapedClassName = NSRegularExpression.escapedPattern(for: className)
+            let pattern = "<(\\w+)([^>]*)class=\"\(escapedClassName)\"([^>]*)>"
+            
+            if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+                let replacement = "<$1$2 style=\"\(style)\"$3>"
+                result = regex.stringByReplacingMatches(in: result, options: [], range: NSRange(location: 0, length: result.utf16.count), withTemplate: replacement)
+            }
+        }
+
+        return result
+    }
 
     
     public func getFormattedString() -> String {
@@ -402,6 +465,31 @@ private extension UITextView {
             let end   = position(from: start, offset: nsRange.length)
         else { return nil }
         return textRange(from: start, to: end)
+    }
+}
+
+import UIKit
+
+public extension UIColor {
+    var hexString: String {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        // Fallback for iOS 12 and below: no dynamic color support
+        if #available(iOS 13.0, *) {
+            let resolvedColor = self.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            resolvedColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        } else {
+            self.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        }
+
+        let r = Int(red * 255)
+        let g = Int(green * 255)
+        let b = Int(blue * 255)
+
+        return String(format: "#%02X%02X%02X", r, g, b)
     }
 }
 
