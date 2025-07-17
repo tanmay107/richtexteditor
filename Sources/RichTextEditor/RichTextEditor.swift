@@ -123,6 +123,25 @@ public class RichTextEditorView: UIView {
         
         return nil
     }
+    
+    public func getXHTML() -> String? {
+        guard let html = getBodyOnlyHTML() else { return nil }
+
+        var xhtml = html
+        xhtml = xhtml.replacingOccurrences(of: "<br>", with: "<br />")
+        xhtml = xhtml.replacingOccurrences(of: "<hr>", with: "<hr />")
+
+        // Add XML header and XHTML namespace manually
+        if xhtml.contains("<html") {
+            xhtml = """
+            <?xml version="1.0" encoding="UTF-8"?>\n
+            \(xhtml.replacingOccurrences(of: "<html>", with: "<html xmlns=\"http://www.w3.org/1999/xhtml\">"))
+            """
+        }
+
+        return xhtml
+    }
+
 
     
     public func getFormattedString() -> String {
