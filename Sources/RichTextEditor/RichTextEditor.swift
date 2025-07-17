@@ -38,6 +38,7 @@ public class RichTextEditorView: UIView {
         textView.isScrollEnabled = true
         textView.alwaysBounceVertical = true
         textView.font = UIFont.systemFont(ofSize: 16)
+        textView.tintColor = .systemBlue
         addSubview(textView)
 
         NSLayoutConstraint.activate([
