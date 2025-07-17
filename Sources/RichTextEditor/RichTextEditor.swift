@@ -63,18 +63,44 @@ public class RichTextEditorView: UIView {
     }
 
     private func toggleTrait(_ trait: UIFontDescriptor.SymbolicTraits) {
-        guard let currentFont = textView.typingAttributes[.font] as? UIFont else { return }
-        var traits = currentFont.fontDescriptor.symbolicTraits
+        let selectedRange = textView.selectedRange
 
-        if traits.contains(trait) {
-            traits.remove(trait)
+        if selectedRange.length > 0 {
+            // Apply to selected text
+            let attributedText = NSMutableAttributedString(attributedString: textView.attributedText)
+            attributedText.enumerateAttribute(.font, in: selectedRange, options: []) { value, range, _ in
+                if let currentFont = value as? UIFont {
+                    var traits = currentFont.fontDescriptor.symbolicTraits
+
+                    if traits.contains(trait) {
+                        traits.remove(trait)
+                    } else {
+                        traits.insert(trait)
+                    }
+
+                    if let newDescriptor = currentFont.fontDescriptor.withSymbolicTraits(traits) {
+                        let newFont = UIFont(descriptor: newDescriptor, size: currentFont.pointSize)
+                        attributedText.addAttribute(.font, value: newFont, range: range)
+                    }
+                }
+            }
+            textView.attributedText = attributedText
+            textView.selectedRange = selectedRange
         } else {
-            traits.insert(trait)
-        }
+            // No selection — apply to typingAttributes
+            guard let currentFont = textView.typingAttributes[.font] as? UIFont else { return }
+            var traits = currentFont.fontDescriptor.symbolicTraits
 
-        if let descriptor = currentFont.fontDescriptor.withSymbolicTraits(traits) {
-            let newFont = UIFont(descriptor: descriptor, size: currentFont.pointSize)
-            textView.typingAttributes[.font] = newFont
+            if traits.contains(trait) {
+                traits.remove(trait)
+            } else {
+                traits.insert(trait)
+            }
+
+            if let descriptor = currentFont.fontDescriptor.withSymbolicTraits(traits) {
+                let newFont = UIFont(descriptor: descriptor, size: currentFont.pointSize)
+                textView.typingAttributes[.font] = newFont
+            }
         }
     }
 
@@ -110,7 +136,6 @@ public class RichTextEditorView: UIView {
     public func getBodyOnlyHTML() -> String? {
         guard let fullHTML = getHTML() else { return nil }
         
-        // Simple regex: captures everything from <html>... including <body>...</body> up to </html>
         let pattern = "(?s)<html.*?>(.*?)</html>"
         
         if let regex = try? NSRegularExpression(pattern: pattern, options: []),
@@ -127,24 +152,14 @@ public class RichTextEditorView: UIView {
     public func getXHTML() -> String? {
         guard var html = getBodyOnlyHTML() else { return nil }
 
-        // Remove all <meta ...> tags using regex
         let metaPattern = "<meta[^>]*>"
         if let regex = try? NSRegularExpression(pattern: metaPattern, options: [.caseInsensitive]) {
             let range = NSRange(location: 0, length: html.utf16.count)
             html = regex.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
         }
 
-        // Replace self-closing tags
         html = html.replacingOccurrences(of: "<br>", with: "<br />")
         html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
-
-        // Add XML header and XHTML namespace
-//        if html.contains("<html") {
-//            html = """
-//            <?xml version="1.0" encoding="UTF-8"?>\n
-//            \(html.replacingOccurrences(of: "<html>", with: "<html xmlns=\"http://www.w3.org/1999/xhtml\">"))
-//            """
-//        }
 
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
