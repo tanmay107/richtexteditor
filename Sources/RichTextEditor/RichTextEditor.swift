@@ -2,7 +2,6 @@
 // https://docs.swift.org/swift-book
 
 import UIKit
-import CoreFoundation
 
 public class RichTextEditorView: UIView {
 
@@ -179,92 +178,96 @@ public class RichTextEditorView: UIView {
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    public func generateInlineStyledHTMLWithListSupport() -> String {
-        let fullRange = NSRange(location: 0, length: textView.attributedText.length)
-        let attributed = textView.attributedText!
-
+    public func generateFullyInlineStyledHTML() -> String {
+        let attributed = textView.attributedText ?? NSAttributedString(string: "")
         var htmlBody = ""
-        var insideUnorderedList = false
-        var insideOrderedList = false
 
-        attributed.enumerateAttributes(in: fullRange, options: []) { attributes, range, _ in
-            let substring = attributed.attributedSubstring(from: range).string.trimmingCharacters(in: .whitespacesAndNewlines)
+        attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attributes, range, _ in
+            let substring = attributed.attributedSubstring(from: range).string.replacingOccurrences(of: "\n", with: "<br />")
 
-            guard !substring.isEmpty else { return }
+            guard !substring.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
-            let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
-            let indent = paragraphStyle?.firstLineHeadIndent ?? 0
+            var tagOpen = "<span"
+            var styleString = ""
+            var content = substring
 
-            // Detect list styles (you can tweak indent threshold as needed)
-            let isListItem = indent > 0
-            let isOrdered = substring.range(of: #"^\d+\.\s"#, options: .regularExpression) != nil
-
-            if isListItem {
-                if isOrdered {
-                    if !insideOrderedList {
-                        htmlBody += "<ol>"
-                        insideOrderedList = true
-                    }
-                } else {
-                    if !insideUnorderedList {
-                        htmlBody += "<ul>"
-                        insideUnorderedList = true
-                    }
+            if let font = attributes[.font] as? UIFont {
+                styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px;"
+                if font.fontDescriptor.symbolicTraits.contains(.traitBold) {
+                    styleString += " font-weight: bold;"
                 }
+                if font.fontDescriptor.symbolicTraits.contains(.traitItalic) {
+                    styleString += " font-style: italic;"
+                }
+            }
 
-                let cleanText = substring.replacingOccurrences(of: #"^\d+\.\s"#, with: "", options: .regularExpression)
-                htmlBody += "<li>\(generateSpanHTML(for: cleanText, attributes: attributes))</li>"
+            if let color = attributes[.foregroundColor] as? UIColor {
+                styleString += " color: \(color.hexString);"
+            }
 
+            if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
+                if paragraph.alignment != .left {
+                    styleString += " text-align: \(paragraph.alignment.cssString);"
+                }
+            }
+
+            if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
+                styleString += " text-decoration: underline;"
+            }
+
+            if let link = attributes[.link] {
+                let href = (link as? URL)?.absoluteString ?? (link as? String) ?? "#"
+                tagOpen = "<a href=\"\(href)\""
+            }
+
+            let finalStyle = styleString.isEmpty ? "" : " style=\"\(styleString.trimmingCharacters(in: .whitespaces))\""
+            htmlBody += "\(tagOpen)\(finalStyle)>\(content)</\(tagOpen.contains("a ") ? "a" : "span")>"
+        }
+
+        return "<html><body>\(htmlBody)</body></html>"
+    }
+    
+    public func generateFullyInlineStyledHTMLWithLists() -> String {
+        let attributed = textView.attributedText ?? NSAttributedString(string: "")
+        let fullString = attributed.string as NSString
+        var htmlBody = ""
+        
+        let paragraphRanges = getParagraphRanges(from: fullString)
+
+        var currentListType: String? = nil
+        var listItems: [String] = []
+
+        for paraRange in paragraphRanges {
+            let paragraphText = fullString.substring(with: paraRange).trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if paragraphText.hasPrefix("• ") {
+                if currentListType != "ul" {
+                    htmlBody += closeList(currentListType, items: listItems)
+                    currentListType = "ul"
+                    listItems = []
+                }
+                listItems.append(buildListItem(from: attributed, range: paraRange, dropPrefix: 2))
+            } else if let orderedNumber = getOrderedNumber(from: paragraphText) {
+                if currentListType != "ol" {
+                    htmlBody += closeList(currentListType, items: listItems)
+                    currentListType = "ol"
+                    listItems = []
+                }
+                let prefixLength = "\(orderedNumber). ".count
+                listItems.append(buildListItem(from: attributed, range: paraRange, dropPrefix: prefixLength))
             } else {
-                if insideUnorderedList {
-                    htmlBody += "</ul>"
-                    insideUnorderedList = false
-                }
-                if insideOrderedList {
-                    htmlBody += "</ol>"
-                    insideOrderedList = false
-                }
-
-                htmlBody += "<p>\(generateSpanHTML(for: substring, attributes: attributes))</p>"
+                htmlBody += closeList(currentListType, items: listItems)
+                currentListType = nil
+                listItems = []
+                htmlBody += buildStyledParagraph(from: attributed, range: paraRange)
             }
         }
 
-        if insideUnorderedList { htmlBody += "</ul>" }
-        if insideOrderedList { htmlBody += "</ol>" }
+        htmlBody += closeList(currentListType, items: listItems)
 
         return "<html><body>\(htmlBody)</body></html>"
     }
 
-    private func generateSpanHTML(for text: String, attributes: [NSAttributedString.Key: Any]) -> String {
-        var styleString = ""
-        var content = text.replacingOccurrences(of: "\n", with: "<br />")
-
-        if let font = attributes[.font] as? UIFont {
-            styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px; "
-            if font.fontDescriptor.symbolicTraits.contains(.traitBold) {
-                styleString += "font-weight: bold; "
-            }
-            if font.fontDescriptor.symbolicTraits.contains(.traitItalic) {
-                styleString += "font-style: italic; "
-            }
-        }
-
-        if let color = attributes[.foregroundColor] as? UIColor {
-            styleString += "color: \(color.hexString); "
-        }
-
-        if attributes[.underlineStyle] != nil {
-            content = "<span style=\"text-decoration: underline;\">\(content)</span>"
-        }
-
-        if let link = attributes[.link] {
-            if let urlString = (link as? URL)?.absoluteString ?? (link as? String) {
-                content = "<a href=\"\(urlString)\">\(content)</a>"
-            }
-        }
-
-        return "<span style=\"\(styleString)\">\(content)</span>"
-    }
 
 
     
@@ -498,20 +501,6 @@ extension RichTextEditorView: UITextViewDelegate {
 
 }
 
-extension RichTextEditorView {
-    private func escapeHTMLSpecialCharacters(in string: String) -> String {
-        var escaped = string
-        escaped = escaped.replacingOccurrences(of: "&", with: "&amp;")
-        escaped = escaped.replacingOccurrences(of: "<", with: "&lt;")
-        escaped = escaped.replacingOccurrences(of: ">", with: "&gt;")
-        escaped = escaped.replacingOccurrences(of: "\"", with: "&quot;")
-        escaped = escaped.replacingOccurrences(of: "'", with: "&#39;")
-        escaped = escaped.replacingOccurrences(of: "•", with: "&#8226;")
-        escaped = escaped.replacingOccurrences(of: "\u{00A0}", with: "&nbsp;")
-        return escaped
-    }
-}
-
 private extension UITextView {
     func range(from nsRange: NSRange) -> UITextRange? {
         guard
@@ -545,3 +534,102 @@ public extension UIColor {
     }
 }
 
+extension NSTextAlignment {
+    var cssString: String {
+        switch self {
+        case .left: return "left"
+        case .center: return "center"
+        case .right: return "right"
+        case .justified: return "justify"
+        case .natural: return "left" // fallback default
+        @unknown default: return "left"
+        }
+    }
+}
+
+extension RichTextEditorView {
+    private func getParagraphRanges(from nsString: NSString) -> [NSRange] {
+        var ranges: [NSRange] = []
+        var searchRange = NSRange(location: 0, length: nsString.length)
+
+        while searchRange.length > 0 {
+            let range = nsString.paragraphRange(for: NSRange(location: searchRange.location, length: 0))
+            ranges.append(range)
+            let newLocation = NSMaxRange(range)
+            searchRange = NSRange(location: newLocation, length: nsString.length - newLocation)
+        }
+        return ranges
+    }
+
+    private func getOrderedNumber(from text: String) -> Int? {
+        let regex = try! NSRegularExpression(pattern: #"^(\d+)\.\s"#)
+        if let match = regex.firstMatch(in: text, range: NSRange(location: 0, length: text.utf16.count)),
+           let range = Range(match.range(at: 1), in: text) {
+            return Int(text[range])
+        }
+        return nil
+    }
+
+    private func closeList(_ type: String?, items: [String]) -> String {
+        guard let type = type, !items.isEmpty else { return "" }
+        return "<\(type)>\(items.joined())</\(type)>"
+    }
+
+    private func buildListItem(from attributed: NSAttributedString, range: NSRange, dropPrefix: Int) -> String {
+        let contentRange = NSRange(location: range.location + dropPrefix, length: range.length - dropPrefix)
+        let contentHTML = buildStyledSpan(from: attributed, range: contentRange)
+        return "<li>\(contentHTML)</li>"
+    }
+
+    private func buildStyledParagraph(from attributed: NSAttributedString, range: NSRange) -> String {
+        let contentHTML = buildStyledSpan(from: attributed, range: range)
+        return "<p>\(contentHTML)</p>"
+    }
+
+    private func buildStyledSpan(from attributed: NSAttributedString, range: NSRange) -> String {
+        var result = ""
+
+        attributed.enumerateAttributes(in: range, options: []) { attributes, subRange, _ in
+            let substring = attributed.attributedSubstring(from: subRange).string
+                .replacingOccurrences(of: "\n", with: "<br />")
+
+            guard !substring.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+            var styleString = ""
+
+            if let font = attributes[.font] as? UIFont {
+                styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px;"
+                if font.fontDescriptor.symbolicTraits.contains(.traitBold) {
+                    styleString += " font-weight: bold;"
+                }
+                if font.fontDescriptor.symbolicTraits.contains(.traitItalic) {
+                    styleString += " font-style: italic;"
+                }
+            }
+
+            if let color = attributes[.foregroundColor] as? UIColor {
+                styleString += " color: \(color.hexString);"
+            }
+
+            if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
+                if paragraph.alignment != .left {
+                    styleString += " text-align: \(paragraph.alignment.cssString);"
+                }
+            }
+
+            if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
+                styleString += " text-decoration: underline;"
+            }
+
+            if let link = attributes[.link] {
+                let href = (link as? URL)?.absoluteString ?? (link as? String) ?? "#"
+                result += "<a href=\"\(href)\" style=\"\(styleString)\">\(substring)</a>"
+            } else {
+                result += "<span style=\"\(styleString)\">\(substring)</span>"
+            }
+        }
+
+        return result
+    }
+
+}
