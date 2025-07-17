@@ -139,12 +139,12 @@ public class RichTextEditorView: UIView {
         html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
 
         // Add XML header and XHTML namespace
-        if html.contains("<html") {
-            html = """
-            <?xml version="1.0" encoding="UTF-8"?>\n
-            \(html.replacingOccurrences(of: "<html>", with: "<html xmlns=\"http://www.w3.org/1999/xhtml\">"))
-            """
-        }
+//        if html.contains("<html") {
+//            html = """
+//            <?xml version="1.0" encoding="UTF-8"?>\n
+//            \(html.replacingOccurrences(of: "<html>", with: "<html xmlns=\"http://www.w3.org/1999/xhtml\">"))
+//            """
+//        }
 
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
