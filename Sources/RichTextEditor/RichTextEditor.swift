@@ -164,6 +164,20 @@ public class RichTextEditorView: UIView {
 
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    
+    public func getHTMLWithInlineCSSOnly() -> String? {
+        guard var html = getXHTML() else { return nil }
+
+        // 1️⃣ Remove <style> blocks from <head>
+        let stylePattern = "<style[^>]*>.*?</style>"
+        if let regex = try? NSRegularExpression(pattern: stylePattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) {
+            let range = NSRange(location: 0, length: html.utf16.count)
+            html = regex.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
+        }
+
+        return html.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
 
 
 
