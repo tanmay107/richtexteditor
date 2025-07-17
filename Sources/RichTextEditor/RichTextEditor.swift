@@ -212,11 +212,21 @@ public class RichTextEditorView: UIView {
                 }
             }
 
-            if attributes[.underlineStyle] != nil {
-                htmlBody += "<span style=\"\(styleString) text-decoration: underline;\">\(substring)</span>"
-            } else {
-                htmlBody += "<span style=\"\(styleString)\">\(substring)</span>"
+            var content = substring
+
+            // Check for underline
+            if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
+                content = "<span style=\"text-decoration: underline;\">\(content)</span>"
             }
+
+            // Check for link
+            if let link = attributes[.link] {
+                if let urlString = (link as? URL)?.absoluteString ?? (link as? String) {
+                    content = "<a href=\"\(urlString)\">\(content)</a>"
+                }
+            }
+
+            htmlBody += "<span style=\"\(styleString)\">\(content)</span>"
         }
 
         let result = """
