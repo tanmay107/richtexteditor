@@ -185,8 +185,9 @@ public class RichTextEditorView: UIView {
         var htmlBody = ""
 
         attributed.enumerateAttributes(in: fullRange, options: []) { attributes, range, _ in
-            let substring = attributed.attributedSubstring(from: range).string
-                .replacingOccurrences(of: "\n", with: "<br />")
+            var substring = attributed.attributedSubstring(from: range).string
+            substring = substring.replacingOccurrences(of: "\n", with: "<br />")
+            substring = escapeForXHTML(substring)
 
             var styleString = ""
 
@@ -214,15 +215,13 @@ public class RichTextEditorView: UIView {
 
             var content = substring
 
-            // Check for underline
             if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
                 content = "<span style=\"text-decoration: underline;\">\(content)</span>"
             }
 
-            // Check for link
             if let link = attributes[.link] {
                 if let urlString = (link as? URL)?.absoluteString ?? (link as? String) {
-                    content = "<a href=\"\(urlString)\">\(content)</a>"
+                    content = "<a href=\"\(escapeForXHTML(urlString))\">\(content)</a>"
                 }
             }
 
@@ -230,13 +229,13 @@ public class RichTextEditorView: UIView {
         }
 
         let result = """
-        <html>
+        <?xml version="1.0" encoding="UTF-8"?>
+        <html xmlns="http://www.w3.org/1999/xhtml">
         <body>\(htmlBody)</body>
         </html>
         """
         return result
     }
-
     
     public func convertCSSClassesToInlineStyles(html: String, styles: [String: String]) -> String {
         var result = html
@@ -468,6 +467,15 @@ extension RichTextEditorView: UITextViewDelegate {
 
 }
 
+extension RichTextEditorView {
+    private func escapeForXHTML(_ string: String) -> String {
+        if let cfString = CFXMLCreateStringByEscapingEntities(nil, string as CFString, nil) {
+            return cfString as String
+        }
+        return string
+    }
+}
+
 private extension UITextView {
     func range(from nsRange: NSRange) -> UITextRange? {
         guard
@@ -477,8 +485,6 @@ private extension UITextView {
         return textRange(from: start, to: end)
     }
 }
-
-import UIKit
 
 public extension UIColor {
     var hexString: String {
