@@ -189,7 +189,7 @@ public class RichTextEditorView: UIView {
 
             var tagOpen = "<span"
             var styleString = ""
-            var content = substring
+            let content = substring
 
             if let font = attributes[.font] as? UIFont {
                 styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px;"
@@ -226,50 +226,6 @@ public class RichTextEditorView: UIView {
 
         return "<html><body>\(htmlBody)</body></html>"
     }
-    
-    public func generateFullyInlineStyledHTMLWithLists() -> String {
-        let attributed = textView.attributedText ?? NSAttributedString(string: "")
-        let fullString = attributed.string as NSString
-        var htmlBody = ""
-        
-        let paragraphRanges = getParagraphRanges(from: fullString)
-
-        var currentListType: String? = nil
-        var listItems: [String] = []
-
-        for paraRange in paragraphRanges {
-            let paragraphText = fullString.substring(with: paraRange).trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if paragraphText.hasPrefix("• ") {
-                if currentListType != "ul" {
-                    htmlBody += closeList(currentListType, items: listItems)
-                    currentListType = "ul"
-                    listItems = []
-                }
-                listItems.append(buildListItem(from: attributed, range: paraRange, dropPrefix: 2))
-            } else if let orderedNumber = getOrderedNumber(from: paragraphText) {
-                if currentListType != "ol" {
-                    htmlBody += closeList(currentListType, items: listItems)
-                    currentListType = "ol"
-                    listItems = []
-                }
-                let prefixLength = "\(orderedNumber). ".count
-                listItems.append(buildListItem(from: attributed, range: paraRange, dropPrefix: prefixLength))
-            } else {
-                htmlBody += closeList(currentListType, items: listItems)
-                currentListType = nil
-                listItems = []
-                htmlBody += buildStyledParagraph(from: attributed, range: paraRange)
-            }
-        }
-
-        htmlBody += closeList(currentListType, items: listItems)
-
-        return "<html><body>\(htmlBody)</body></html>"
-    }
-
-
-
     
     public func convertCSSClassesToInlineStyles(html: String, styles: [String: String]) -> String {
         var result = html
@@ -548,88 +504,95 @@ extension NSTextAlignment {
 }
 
 extension RichTextEditorView {
-    private func getParagraphRanges(from nsString: NSString) -> [NSRange] {
-        var ranges: [NSRange] = []
-        var searchRange = NSRange(location: 0, length: nsString.length)
-
-        while searchRange.length > 0 {
-            let range = nsString.paragraphRange(for: NSRange(location: searchRange.location, length: 0))
-            ranges.append(range)
-            let newLocation = NSMaxRange(range)
-            searchRange = NSRange(location: newLocation, length: nsString.length - newLocation)
-        }
-        return ranges
-    }
-
-    private func getOrderedNumber(from text: String) -> Int? {
-        let regex = try! NSRegularExpression(pattern: #"^(\d+)\.\s"#)
-        if let match = regex.firstMatch(in: text, range: NSRange(location: 0, length: text.utf16.count)),
-           let range = Range(match.range(at: 1), in: text) {
-            return Int(text[range])
-        }
-        return nil
-    }
-
-    private func closeList(_ type: String?, items: [String]) -> String {
-        guard let type = type, !items.isEmpty else { return "" }
-        return "<\(type)>\(items.joined())</\(type)>"
-    }
-
-    private func buildListItem(from attributed: NSAttributedString, range: NSRange, dropPrefix: Int) -> String {
-        let contentRange = NSRange(location: range.location + dropPrefix, length: range.length - dropPrefix)
-        let contentHTML = buildStyledSpan(from: attributed, range: contentRange)
-        return "<li>\(contentHTML)</li>"
-    }
-
-    private func buildStyledParagraph(from attributed: NSAttributedString, range: NSRange) -> String {
-        let contentHTML = buildStyledSpan(from: attributed, range: range)
-        return "<p>\(contentHTML)</p>"
-    }
-
-    private func buildStyledSpan(from attributed: NSAttributedString, range: NSRange) -> String {
-        var result = ""
-
-        attributed.enumerateAttributes(in: range, options: []) { attributes, subRange, _ in
-            let substring = attributed.attributedSubstring(from: subRange).string
+    public func generateFullyInlineStyledHTMLWithLists() -> String {
+        let attributed = textView.attributedText ?? NSAttributedString(string: "")
+        var htmlBody = ""
+        
+        var listMode: NSTextList? = nil
+        var currentListItems: [String] = []
+        
+        attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length), options: []) { attributes, range, _ in
+            let substring = attributed.attributedSubstring(from: range).string
                 .replacingOccurrences(of: "\n", with: "<br />")
-
-            guard !substring.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-
-            var styleString = ""
-
-            if let font = attributes[.font] as? UIFont {
-                styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px;"
-                if font.fontDescriptor.symbolicTraits.contains(.traitBold) {
-                    styleString += " font-weight: bold;"
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            guard !substring.isEmpty else { return }
+            
+            let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
+            let textList = paragraphStyle?.textLists.first
+            
+            if let currentList = textList {
+                if listMode == nil || listMode != currentList {
+                    if !currentListItems.isEmpty {
+                        htmlBody += wrapListItems(currentListItems, listType: listMode)
+                        currentListItems.removeAll()
+                    }
+                    listMode = currentList
                 }
-                if font.fontDescriptor.symbolicTraits.contains(.traitItalic) {
-                    styleString += " font-style: italic;"
-                }
-            }
-
-            if let color = attributes[.foregroundColor] as? UIColor {
-                styleString += " color: \(color.hexString);"
-            }
-
-            if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
-                if paragraph.alignment != .left {
-                    styleString += " text-align: \(paragraph.alignment.cssString);"
-                }
-            }
-
-            if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
-                styleString += " text-decoration: underline;"
-            }
-
-            if let link = attributes[.link] {
-                let href = (link as? URL)?.absoluteString ?? (link as? String) ?? "#"
-                result += "<a href=\"\(href)\" style=\"\(styleString)\">\(substring)</a>"
+                
+                let styledContent = generateStyledSpan(from: attributes, content: substring)
+                currentListItems.append(styledContent)
+                
             } else {
-                result += "<span style=\"\(styleString)\">\(substring)</span>"
+                if !currentListItems.isEmpty {
+                    htmlBody += wrapListItems(currentListItems, listType: listMode)
+                    currentListItems.removeAll()
+                    listMode = nil
+                }
+                
+                htmlBody += generateStyledSpan(from: attributes, content: substring)
             }
         }
-
-        return result
+        
+        if !currentListItems.isEmpty {
+            htmlBody += wrapListItems(currentListItems, listType: listMode)
+        }
+        
+        return "<html><body>\(htmlBody)</body></html>"
     }
-
+    
+    private func wrapListItems(_ items: [String], listType: NSTextList?) -> String {
+        let isOrdered = listType?.markerFormat == .decimal
+        let tag = isOrdered ? "ol" : "ul"
+        let liItems = items.map { "<li>\($0)</li>" }.joined()
+        return "<\(tag)>\(liItems)</\(tag)>"
+    }
+    
+    private func generateStyledSpan(from attributes: [NSAttributedString.Key: Any], content: String) -> String {
+        var styleString = ""
+        var tagOpen = "<span"
+        
+        if let font = attributes[.font] as? UIFont {
+            styleString += "font-family: \(font.familyName); font-size: \(Int(font.pointSize))px;"
+            if font.fontDescriptor.symbolicTraits.contains(.traitBold) {
+                styleString += " font-weight: bold;"
+            }
+            if font.fontDescriptor.symbolicTraits.contains(.traitItalic) {
+                styleString += " font-style: italic;"
+            }
+        }
+        
+        if let color = attributes[.foregroundColor] as? UIColor {
+            styleString += " color: \(color.hexString);"
+        }
+        
+        if let paragraph = attributes[.paragraphStyle] as? NSParagraphStyle {
+            if paragraph.alignment != .left {
+                styleString += " text-align: \(paragraph.alignment.cssString);"
+            }
+        }
+        
+        if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
+            styleString += " text-decoration: underline;"
+        }
+        
+        if let link = attributes[.link] {
+            let href = (link as? URL)?.absoluteString ?? (link as? String) ?? "#"
+            tagOpen = "<a href=\"\(href)\""
+        }
+        
+        let finalStyle = styleString.isEmpty ? "" : " style=\"\(styleString.trimmingCharacters(in: .whitespaces))\""
+        return "\(tagOpen)\(finalStyle)>\(content)</\(tagOpen.contains("a ") ? "a" : "span")>"
+    }
+    
 }
