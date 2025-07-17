@@ -125,21 +125,27 @@ public class RichTextEditorView: UIView {
     }
     
     public func getXHTML() -> String? {
-        guard let html = getBodyOnlyHTML() else { return nil }
+        guard var html = getBodyOnlyHTML() else { return nil }
 
-        var xhtml = html
-        xhtml = xhtml.replacingOccurrences(of: "<br>", with: "<br />")
-        xhtml = xhtml.replacingOccurrences(of: "<hr>", with: "<hr />")
+        // Self-close <meta> tags if not already closed
+        let metaPattern = "<meta([^>/]*)(?<!/)>"
+        if let regex = try? NSRegularExpression(pattern: metaPattern, options: [.caseInsensitive]) {
+            html = regex.stringByReplacingMatches(in: html, options: [], range: NSRange(location: 0, length: html.utf16.count), withTemplate: "<meta$1 />")
+        }
+
+        // Self-close <br> and <hr> as well
+        html = html.replacingOccurrences(of: "<br>", with: "<br />")
+        html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
 
         // Add XML header and XHTML namespace manually
-        if xhtml.contains("<html") {
-            xhtml = """
+        if html.contains("<html") {
+            html = """
             <?xml version="1.0" encoding="UTF-8"?>\n
-            \(xhtml.replacingOccurrences(of: "<html>", with: "<html xmlns=\"http://www.w3.org/1999/xhtml\">"))
+            \(html.replacingOccurrences(of: "<html>", with: "<html xmlns=\"http://www.w3.org/1999/xhtml\">"))
             """
         }
 
-        return xhtml
+        return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
 
