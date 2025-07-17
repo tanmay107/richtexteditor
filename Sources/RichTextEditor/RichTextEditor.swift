@@ -2,6 +2,7 @@
 // https://docs.swift.org/swift-book
 
 import UIKit
+import CoreFoundation
 
 public class RichTextEditorView: UIView {
 
@@ -185,9 +186,8 @@ public class RichTextEditorView: UIView {
         var htmlBody = ""
 
         attributed.enumerateAttributes(in: fullRange, options: []) { attributes, range, _ in
-            var substring = attributed.attributedSubstring(from: range).string
-            substring = substring.replacingOccurrences(of: "\n", with: "<br />")
-            substring = escapeForXHTML(substring)
+            let rawSubstring = attributed.attributedSubstring(from: range).string
+            let escapedContent = escapeHTMLSpecialCharacters(in: rawSubstring.replacingOccurrences(of: "\n", with: "<br />"))
 
             var styleString = ""
 
@@ -213,7 +213,7 @@ public class RichTextEditorView: UIView {
                 }
             }
 
-            var content = substring
+            var content = escapedContent
 
             if let underline = attributes[.underlineStyle] as? Int, underline > 0 {
                 content = "<span style=\"text-decoration: underline;\">\(content)</span>"
@@ -221,7 +221,7 @@ public class RichTextEditorView: UIView {
 
             if let link = attributes[.link] {
                 if let urlString = (link as? URL)?.absoluteString ?? (link as? String) {
-                    content = "<a href=\"\(escapeForXHTML(urlString))\">\(content)</a>"
+                    content = "<a href=\"\(urlString)\">\(content)</a>"
                 }
             }
 
@@ -229,13 +229,13 @@ public class RichTextEditorView: UIView {
         }
 
         let result = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <html xmlns="http://www.w3.org/1999/xhtml">
+        <html>
         <body>\(htmlBody)</body>
         </html>
         """
         return result
     }
+
     
     public func convertCSSClassesToInlineStyles(html: String, styles: [String: String]) -> String {
         var result = html
@@ -468,11 +468,16 @@ extension RichTextEditorView: UITextViewDelegate {
 }
 
 extension RichTextEditorView {
-    private func escapeForXHTML(_ string: String) -> String {
-        if let cfString = CFXMLCreateStringByEscapingEntities(nil, string as CFString, nil) {
-            return cfString as String
-        }
-        return string
+    private func escapeHTMLSpecialCharacters(in string: String) -> String {
+        var escaped = string
+        escaped = escaped.replacingOccurrences(of: "&", with: "&amp;")
+        escaped = escaped.replacingOccurrences(of: "<", with: "&lt;")
+        escaped = escaped.replacingOccurrences(of: ">", with: "&gt;")
+        escaped = escaped.replacingOccurrences(of: "\"", with: "&quot;")
+        escaped = escaped.replacingOccurrences(of: "'", with: "&#39;")
+        escaped = escaped.replacingOccurrences(of: "•", with: "&#8226;")
+        escaped = escaped.replacingOccurrences(of: "\u{00A0}", with: "&nbsp;")
+        return escaped
     }
 }
 
