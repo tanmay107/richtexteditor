@@ -150,77 +150,20 @@ public class RichTextEditorView: UIView {
         return nil
     }
     
-    public func getXHTML(prefixedClass: String = "") -> String? {
+    public func getXHTML() -> String? {
         guard var html = getBodyOnlyHTML() else { return nil }
 
-        // 🔹 Remove <meta> tags
         let metaPattern = "<meta[^>]*>"
         if let regex = try? NSRegularExpression(pattern: metaPattern, options: [.caseInsensitive]) {
             let range = NSRange(location: 0, length: html.utf16.count)
             html = regex.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
         }
 
-        // 🔹 Replace <br> and <hr> with self-closing versions
         html = html.replacingOccurrences(of: "<br>", with: "<br />")
         html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
 
-        guard !prefixedClass.isEmpty else {
-            return html.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        // 🔹 Modify class selectors inside <style> blocks
-        let styleRegex = try! NSRegularExpression(pattern: "(<style[^>]*>)([\\s\\S]*?)(</style>)", options: [.caseInsensitive])
-        if let match = styleRegex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-           let styleContentRange = Range(match.range(at: 2), in: html),
-           let startTagRange = Range(match.range(at: 1), in: html),
-           let endTagRange = Range(match.range(at: 3), in: html),
-           let fullMatchRange = Range(match.range, in: html) {
-
-            var styleContent = String(html[styleContentRange])
-
-            // Match class selectors like `.p1`, `.s2`, `.ul1`
-            let classSelectorRegex = try! NSRegularExpression(pattern: #"(?<=\.)[a-zA-Z0-9_-]+"#)
-            let matches = classSelectorRegex.matches(in: styleContent, range: NSRange(styleContent.startIndex..., in: styleContent))
-
-            for match in matches.reversed() {
-                if let range = Range(match.range, in: styleContent) {
-                    let original = styleContent[range]
-                    styleContent.replaceSubrange(range, with: "\(prefixedClass)\(original)")
-                }
-            }
-
-            // Rebuild and replace style block
-            let startTag = html[startTagRange]
-            let endTag = html[endTagRange]
-            let newStyleBlock = "\(startTag)\(styleContent)\(endTag)"
-            html.replaceSubrange(fullMatchRange, with: newStyleBlock)
-        }
-
-        // 🔹 Modify class attributes in HTML tags
-        let classAttrRegex = try! NSRegularExpression(pattern: #"class\s*=\s*"([^"]+)""#)
-        let attrMatches = classAttrRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
-
-        var offset = 0
-        for match in attrMatches {
-            guard let classRange = Range(match.range(at: 1), in: html) else { continue }
-
-            let originalClasses = html[classRange]
-            let prefixed = originalClasses
-                .split(separator: " ")
-                .map { prefixedClass + $0 }
-                .joined(separator: " ")
-
-            let nsRange = match.range(at: 1)
-            if let swiftRange = Range(NSRange(location: nsRange.location + offset, length: nsRange.length), in: html) {
-                html.replaceSubrange(swiftRange, with: prefixed)
-                offset += prefixed.count - nsRange.length
-            }
-        }
-
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-
-
     
     public func getHTMLWithInlineCSSOnly() -> String? {
         guard var html = getXHTML() else { return nil }
