@@ -168,46 +168,58 @@ public class RichTextEditorView: UIView {
             return html.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        // 🔹 Prefix class names in <style> blocks
-        if let styleRange = html.range(of: "<style[^>]*>.*?</style>", options: .regularExpression) {
-            let originalStyleBlock = String(html[styleRange])
+        // 🔹 Modify class selectors inside <style> blocks
+        let styleRegex = try! NSRegularExpression(pattern: "(<style[^>]*>)([\\s\\S]*?)(</style>)", options: [.caseInsensitive])
+        if let match = styleRegex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+           let styleContentRange = Range(match.range(at: 2), in: html),
+           let startTagRange = Range(match.range(at: 1), in: html),
+           let endTagRange = Range(match.range(at: 3), in: html),
+           let fullMatchRange = Range(match.range, in: html) {
 
-            let classRefRegex = try! NSRegularExpression(pattern: #"(?<=\.)([a-zA-Z0-9_-]+)"#)
-            let updatedStyleBlock = classRefRegex.stringByReplacingMatches(
-                in: originalStyleBlock,
-                options: [],
-                range: NSRange(originalStyleBlock.startIndex..., in: originalStyleBlock),
-                withTemplate: "\(prefixedClass)$1"
-            )
+            var styleContent = String(html[styleContentRange])
 
-            html.replaceSubrange(styleRange, with: updatedStyleBlock)
+            // Match class selectors like `.p1`, `.s2`, `.ul1`
+            let classSelectorRegex = try! NSRegularExpression(pattern: #"(?<=\.)[a-zA-Z0-9_-]+"#)
+            let matches = classSelectorRegex.matches(in: styleContent, range: NSRange(styleContent.startIndex..., in: styleContent))
+
+            for match in matches.reversed() {
+                if let range = Range(match.range, in: styleContent) {
+                    let original = styleContent[range]
+                    styleContent.replaceSubrange(range, with: "\(prefixedClass)\(original)")
+                }
+            }
+
+            // Rebuild and replace style block
+            let startTag = html[startTagRange]
+            let endTag = html[endTagRange]
+            let newStyleBlock = "\(startTag)\(styleContent)\(endTag)"
+            html.replaceSubrange(fullMatchRange, with: newStyleBlock)
         }
 
-        // 🔹 Prefix class names in HTML elements
-        let classRegex = try! NSRegularExpression(pattern: #"class\s*=\s*"([^"]+)""#)
-        let matches = classRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+        // 🔹 Modify class attributes in HTML tags
+        let classAttrRegex = try! NSRegularExpression(pattern: #"class\s*=\s*"([^"]+)""#)
+        let attrMatches = classAttrRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
 
-        var result = html
         var offset = 0
+        for match in attrMatches {
+            guard let classRange = Range(match.range(at: 1), in: html) else { continue }
 
-        for match in matches {
-            guard let classRange = Range(match.range(at: 1), in: result) else { continue }
-
-            let originalClassValue = result[classRange]
-            let prefixedClasses = originalClassValue
+            let originalClasses = html[classRange]
+            let prefixed = originalClasses
                 .split(separator: " ")
                 .map { prefixedClass + $0 }
                 .joined(separator: " ")
 
-            let fullMatchRange = match.range(at: 1)
-            if let swiftRange = Range(NSRange(location: fullMatchRange.location + offset, length: fullMatchRange.length), in: result) {
-                result.replaceSubrange(swiftRange, with: prefixedClasses)
-                offset += prefixedClasses.count - fullMatchRange.length
+            let nsRange = match.range(at: 1)
+            if let swiftRange = Range(NSRange(location: nsRange.location + offset, length: nsRange.length), in: html) {
+                html.replaceSubrange(swiftRange, with: prefixed)
+                offset += prefixed.count - nsRange.length
             }
         }
 
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
 
     
     public func getHTMLWithInlineCSSOnly() -> String? {
