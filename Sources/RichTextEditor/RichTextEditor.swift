@@ -150,17 +150,46 @@ public class RichTextEditorView: UIView {
         return nil
     }
     
-    public func getXHTML() -> String? {
+    public func getXHTML(prefixedClass: String = "") -> String? {
         guard var html = getBodyOnlyHTML() else { return nil }
 
+        // 🔹 Remove <meta> tags
         let metaPattern = "<meta[^>]*>"
         if let regex = try? NSRegularExpression(pattern: metaPattern, options: [.caseInsensitive]) {
             let range = NSRange(location: 0, length: html.utf16.count)
             html = regex.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
         }
 
+        // 🔹 Replace <br> and <hr> with self-closing versions
         html = html.replacingOccurrences(of: "<br>", with: "<br />")
         html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
+
+        // 🔹 Add prefix to all class names
+        if !prefixedClass.isEmpty {
+            let classRegex = try! NSRegularExpression(pattern: #"class\s*=\s*"([^"]+)""#)
+            let matches = classRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+
+            var result = html
+            var offset = 0
+
+            for match in matches {
+                guard let classRange = Range(match.range(at: 1), in: result) else { continue }
+
+                let originalClassValue = result[classRange]
+                let prefixedClasses = originalClassValue
+                    .split(separator: " ")
+                    .map { prefixedClass + $0 }
+                    .joined(separator: " ")
+
+                let fullMatchRange = match.range(at: 1)
+                if let swiftRange = Range(NSRange(location: fullMatchRange.location + offset, length: fullMatchRange.length), in: result) {
+                    result.replaceSubrange(swiftRange, with: prefixedClasses)
+                    offset += prefixedClasses.count - fullMatchRange.length
+                }
+            }
+
+            html = result
+        }
 
         return html.trimmingCharacters(in: .whitespacesAndNewlines)
     }
