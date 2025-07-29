@@ -277,67 +277,59 @@ public class RichTextEditorView: UIView {
 
     // 2️⃣ The list formatter
     public func applyListStyle(_ style: ListStyle) {
+        // 1⃣ Get the paragraph range of the selected text
+        let fullText = textView.textStorage
+        let selectedNS = textView.selectedRange
+        let paraRange = (fullText.string as NSString).paragraphRange(for: selectedNS)
 
-        // 1⃣ Grab the range that should be affected — full paragraphs of the selection
-        let fullText     = textView.textStorage            // NSAttributedString
-        let selectedNS   = textView.selectedRange          // NSRange
-        let paraRange    = (fullText.string as NSString)
-                            .paragraphRange(for: selectedNS)
+        // 2⃣ Split into lines
+        let original = (fullText.string as NSString).substring(with: paraRange)
+        var lines = original.components(separatedBy: "\n")
 
-        // 2⃣ Split the affected substring into individual lines
-        let original     = (fullText.string as NSString)
-                            .substring(with: paraRange)
-        var lines        = original.components(separatedBy: "\n")
-
-        // 3⃣ Build the new lines
+        // 3⃣ Build new lines
         var newLines: [String] = []
         var number = 1
+
         for line in lines {
-
-            // Trim leading spaces so we can reliably detect existing bullets
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+            var cleanedLine = trimmed
+
+            // Remove bullet if present
+            if cleanedLine.hasPrefix("• ") {
+                cleanedLine = String(cleanedLine.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            }
+
+            // Remove number if present (e.g., "1. ")
+            let regex = try! NSRegularExpression(pattern: #"^\d+\.\s"#)
+            if let match = regex.firstMatch(in: cleanedLine, range: NSRange(location: 0, length: cleanedLine.utf16.count)),
+               let range = Range(match.range, in: cleanedLine) {
+                cleanedLine = String(cleanedLine[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            }
+
             switch style {
-
             case .unordered:
-                if trimmed.hasPrefix("• ") {
-                    newLines.append(line)                // already bulleted
-                } else {
-                    newLines.append("• " + line)
-                }
-
+                newLines.append("• \(cleanedLine)")
             case .ordered:
-                let regex  = try! NSRegularExpression(pattern: #"^\d+\.\s"#)
-                if regex.firstMatch(in: trimmed,
-                                    range: NSRange(location: 0,
-                                                   length: trimmed.utf16.count)) != nil {
-                    newLines.append(line)                // already numbered
-                } else {
-                    newLines.append("\(number). " + line)
-                }
+                newLines.append("\(number). \(cleanedLine)")
                 number += 1
             }
         }
 
         let replacement = newLines.joined(separator: "\n")
 
-        // 4⃣ Apply replacement—preserve attributes by going through textStorage
+        // 4⃣ Replace with attributed version
         textView.textStorage.beginEditing()
         let attrReplacement = NSMutableAttributedString(string: replacement)
-
-        // Copy base typing attributes into the replacement so new text blends in
-        attrReplacement.addAttributes(textView.typingAttributes,
-                                      range: NSRange(location: 0,
-                                                     length: attrReplacement.length))
-
+        attrReplacement.addAttributes(textView.typingAttributes, range: NSRange(location: 0, length: attrReplacement.length))
         textView.textStorage.replaceCharacters(in: paraRange, with: attrReplacement)
         textView.textStorage.endEditing()
 
-        // 5⃣ Restore selection relative to new text
+        // 5⃣ Restore selection
         let newSelectedLocation = paraRange.location
-        let newSelectedLength   = attrReplacement.length
-        textView.selectedRange  = NSRange(location: newSelectedLocation,
-                                          length: newSelectedLength)
+        let newSelectedLength = attrReplacement.length
+        textView.selectedRange = NSRange(location: newSelectedLocation, length: newSelectedLength)
     }
+
     
     public func applyTextColor(_ color: UIColor) {
         guard let range = textView.selectedTextRange else { return }
