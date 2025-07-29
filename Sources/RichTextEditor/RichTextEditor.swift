@@ -164,35 +164,51 @@ public class RichTextEditorView: UIView {
         html = html.replacingOccurrences(of: "<br>", with: "<br />")
         html = html.replacingOccurrences(of: "<hr>", with: "<hr />")
 
-        // 🔹 Add prefix to all class names
-        if !prefixedClass.isEmpty {
-            let classRegex = try! NSRegularExpression(pattern: #"class\s*=\s*"([^"]+)""#)
-            let matches = classRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
-
-            var result = html
-            var offset = 0
-
-            for match in matches {
-                guard let classRange = Range(match.range(at: 1), in: result) else { continue }
-
-                let originalClassValue = result[classRange]
-                let prefixedClasses = originalClassValue
-                    .split(separator: " ")
-                    .map { prefixedClass + $0 }
-                    .joined(separator: " ")
-
-                let fullMatchRange = match.range(at: 1)
-                if let swiftRange = Range(NSRange(location: fullMatchRange.location + offset, length: fullMatchRange.length), in: result) {
-                    result.replaceSubrange(swiftRange, with: prefixedClasses)
-                    offset += prefixedClasses.count - fullMatchRange.length
-                }
-            }
-
-            html = result
+        guard !prefixedClass.isEmpty else {
+            return html.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        return html.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 🔹 Prefix class names in <style> blocks
+        if let styleRange = html.range(of: "<style[^>]*>.*?</style>", options: .regularExpression) {
+            let originalStyleBlock = String(html[styleRange])
+
+            let classRefRegex = try! NSRegularExpression(pattern: #"(?<=\.)([a-zA-Z0-9_-]+)"#)
+            let updatedStyleBlock = classRefRegex.stringByReplacingMatches(
+                in: originalStyleBlock,
+                options: [],
+                range: NSRange(originalStyleBlock.startIndex..., in: originalStyleBlock),
+                withTemplate: "\(prefixedClass)$1"
+            )
+
+            html.replaceSubrange(styleRange, with: updatedStyleBlock)
+        }
+
+        // 🔹 Prefix class names in HTML elements
+        let classRegex = try! NSRegularExpression(pattern: #"class\s*=\s*"([^"]+)""#)
+        let matches = classRegex.matches(in: html, range: NSRange(html.startIndex..., in: html))
+
+        var result = html
+        var offset = 0
+
+        for match in matches {
+            guard let classRange = Range(match.range(at: 1), in: result) else { continue }
+
+            let originalClassValue = result[classRange]
+            let prefixedClasses = originalClassValue
+                .split(separator: " ")
+                .map { prefixedClass + $0 }
+                .joined(separator: " ")
+
+            let fullMatchRange = match.range(at: 1)
+            if let swiftRange = Range(NSRange(location: fullMatchRange.location + offset, length: fullMatchRange.length), in: result) {
+                result.replaceSubrange(swiftRange, with: prefixedClasses)
+                offset += prefixedClasses.count - fullMatchRange.length
+            }
+        }
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
     
     public func getHTMLWithInlineCSSOnly() -> String? {
         guard var html = getXHTML() else { return nil }
