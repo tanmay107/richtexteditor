@@ -398,11 +398,10 @@ extension RichTextEditorView: UITextViewDelegate {
             let updatedText = currentText.replacingCharacters(in: textRange, with: text)
 
             // 📍 Word count logic
-            let words = updatedText
-                .components(separatedBy: .whitespacesAndNewlines)
-                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let characterCount = updatedText.count
+            wordCountChangedHandler?(characterCount)
 
-            wordCountChangedHandler?(words.count)
+//            wordCountChangedHandler?(words.count)
         }
 
         // ✅ Keep list handling logic (Return key)
