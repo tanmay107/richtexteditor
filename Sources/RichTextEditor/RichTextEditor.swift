@@ -87,7 +87,11 @@ public class RichTextEditorView: UIView {
                     }
                 }
             }
+            
+            // Preserve scroll position and selection
+            let currentOffset = textView.contentOffset
             textView.attributedText = attributedText
+            textView.contentOffset = currentOffset
             textView.selectedRange = selectedRange
         } else {
             // No selection — apply to typingAttributes
@@ -112,7 +116,11 @@ public class RichTextEditorView: UIView {
         if selectedRange.length > 0 {
             let attributedText = NSMutableAttributedString(attributedString: textView.attributedText)
             attributedText.addAttribute(attribute, value: value, range: selectedRange)
+            
+            // Preserve scroll position
+            let currentOffset = textView.contentOffset
             textView.attributedText = attributedText
+            textView.contentOffset = currentOffset
         } else {
             textView.typingAttributes[attribute] = value
         }
@@ -375,7 +383,10 @@ public class RichTextEditorView: UIView {
             fullText.addAttribute(.paragraphStyle, value: mutableStyle, range: range)
         }
 
+        // Preserve scroll position and selection
+        let currentOffset = textView.contentOffset
         textView.attributedText = fullText
+        textView.contentOffset = currentOffset
         textView.selectedRange = selectedRange  // Preserve cursor position
 
         // Also update typingAttributes so new text stays aligned
@@ -424,10 +435,14 @@ extension RichTextEditorView: UITextViewDelegate {
         // 3️⃣ Unordered bullet
         if trimmedLine.hasPrefix(bulletPref) {
             if isLineEmpty(bulletPref) {
+                let currentOffset = textView.contentOffset
                 textView.replace(textView.range(from: paraRange)!, withText: "\n")
+                textView.contentOffset = currentOffset
                 return false
             }
+            let currentOffset = textView.contentOffset
             textView.replace(textView.range(from: range)!, withText: "\n" + bulletPref)
+            textView.contentOffset = currentOffset
             return false
         }
 
@@ -438,19 +453,36 @@ extension RichTextEditorView: UITextViewDelegate {
            let currentNum = Int(trimmedLine[numberRange]) {
 
             if isLineEmpty("\(currentNum). ") {
+                let currentOffset = textView.contentOffset
                 textView.replace(textView.range(from: paraRange)!, withText: "\n")
+                textView.contentOffset = currentOffset
                 return false
             }
 
             let insert = "\n\(currentNum + 1). "
+            let currentOffset = textView.contentOffset
             textView.replace(textView.range(from: range)!, withText: insert)
+            textView.contentOffset = currentOffset
             return false
         }
 
         return true
     }
 
-
+    // MARK: - Auto-scroll to cursor
+    public func textViewDidChange(_ textView: UITextView) {
+        // Auto-scroll to show the cursor when typing at the bottom
+        DispatchQueue.main.async {
+            let selectedRange = textView.selectedRange
+            if selectedRange.location == textView.text.count {
+                // Cursor is at the end, scroll to bottom
+                let bottom = textView.contentSize.height - textView.bounds.height
+                if bottom > 0 {
+                    textView.setContentOffset(CGPoint(x: 0, y: bottom), animated: true)
+                }
+            }
+        }
+    }
 }
 
 private extension UITextView {
