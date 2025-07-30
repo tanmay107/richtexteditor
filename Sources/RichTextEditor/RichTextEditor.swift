@@ -21,6 +21,7 @@ public class RichTextEditorView: UIView {
     }
     
     public var wordCountChangedHandler: ((Int) -> Void)?
+    public var maxCharacterCount: Int?
 
 
     public override init(frame: CGRect) {
@@ -403,17 +404,19 @@ extension RichTextEditorView: UITextViewDelegate {
                          replacementText text: String) -> Bool {
 
         // 📍 First: simulate what the text will be
+        
         if let currentText = textView.text,
            let textRange = Range(range, in: currentText) {
 
             let updatedText = currentText.replacingCharacters(in: textRange, with: text)
 
-            // 📍 Word count logic
-            let characterCount = updatedText.count
-            wordCountChangedHandler?(characterCount)
+            if let limit = maxCharacterCount, updatedText.count > limit {
+                return false
+            }
 
-//            wordCountChangedHandler?(words.count)
+            wordCountChangedHandler?(updatedText.count)
         }
+
 
         // ✅ Keep list handling logic (Return key)
         guard text == "\n" else { return true }
