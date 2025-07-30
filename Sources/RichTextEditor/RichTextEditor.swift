@@ -87,11 +87,7 @@ public class RichTextEditorView: UIView {
                     }
                 }
             }
-            let offset = textView.contentOffset
-//            let offset = textView.contentOffset
             textView.attributedText = attributedText
-//            textView.contentOffset = offset
-            textView.contentOffset = offset
             textView.selectedRange = selectedRange
         } else {
             // No selection — apply to typingAttributes
@@ -116,9 +112,7 @@ public class RichTextEditorView: UIView {
         if selectedRange.length > 0 {
             let attributedText = NSMutableAttributedString(attributedString: textView.attributedText)
             attributedText.addAttribute(attribute, value: value, range: selectedRange)
-            let offset = textView.contentOffset
             textView.attributedText = attributedText
-            textView.contentOffset = offset
         } else {
             textView.typingAttributes[attribute] = value
         }
@@ -381,9 +375,7 @@ public class RichTextEditorView: UIView {
             fullText.addAttribute(.paragraphStyle, value: mutableStyle, range: range)
         }
 
-        let offset = textView.contentOffset
         textView.attributedText = fullText
-        textView.contentOffset = offset
         textView.selectedRange = selectedRange  // Preserve cursor position
 
         // Also update typingAttributes so new text stays aligned
