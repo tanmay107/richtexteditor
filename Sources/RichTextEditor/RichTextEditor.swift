@@ -19,6 +19,8 @@ public class RichTextEditorView: UIView {
             return .black        // static black on iOS 12 or earlier
         }
     }
+    
+    public var wordCountChangedHandler: ((Int) -> Void)?
 
 
     public override init(frame: CGRect) {
@@ -389,63 +391,66 @@ extension RichTextEditorView: UITextViewDelegate {
                          shouldChangeTextIn range: NSRange,
                          replacementText text: String) -> Bool {
 
-        // We only care about Return presses
+        // 📍 First: simulate what the text will be
+        if let currentText = textView.text,
+           let textRange = Range(range, in: currentText) {
+
+            let updatedText = currentText.replacingCharacters(in: textRange, with: text)
+
+            // 📍 Word count logic
+            let words = updatedText
+                .components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+            wordCountChangedHandler?(words.count)
+        }
+
+        // ✅ Keep list handling logic (Return key)
         guard text == "\n" else { return true }
 
-        // 1️⃣ Identify the current paragraph
-        let nsString    = textView.text as NSString
-        let paraRange   = nsString.paragraphRange(for: range)
-        let line        = nsString.substring(with: paraRange)
+        // 1️⃣ Identify current paragraph
+        let nsString = textView.text as NSString
+        let paraRange = nsString.paragraphRange(for: range)
+        let line = nsString.substring(with: paraRange)
 
         // 2️⃣ Detect prefix
-        let bulletPref  = "• "
-        let orderedRE   = try! NSRegularExpression(pattern: #"^(\d+)\.\s"#)
+        let bulletPref = "• "
+        let orderedRE = try! NSRegularExpression(pattern: #"^(\d+)\.\s"#)
         let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // If the line has no content besides its prefix → exit list
         let isLineEmpty = { (prefix: String) -> Bool in
             trimmedLine == prefix.trimmingCharacters(in: .whitespaces)
         }
 
         // 3️⃣ Unordered bullet
         if trimmedLine.hasPrefix(bulletPref) {
-
             if isLineEmpty(bulletPref) {
-                // Remove the bullet and just insert a newline
                 textView.replace(textView.range(from: paraRange)!, withText: "\n")
                 return false
             }
-
-            // Insert newline + bullet
-            let insert = "\n" + bulletPref
-            textView.replace(textView.range(from: range)!, withText: insert)
+            textView.replace(textView.range(from: range)!, withText: "\n" + bulletPref)
             return false
         }
 
         // 4️⃣ Ordered list
         if let match = orderedRE.firstMatch(in: trimmedLine,
-                                            range: NSRange(location: 0,
-                                                           length: trimmedLine.utf16.count)),
+                                            range: NSRange(location: 0, length: trimmedLine.utf16.count)),
            let numberRange = Range(match.range(at: 1), in: trimmedLine),
-           let currentNum  = Int(trimmedLine[numberRange]) {
-
-            let prefix = "\(currentNum + 1). "
+           let currentNum = Int(trimmedLine[numberRange]) {
 
             if isLineEmpty("\(currentNum). ") {
-                // Exit list
                 textView.replace(textView.range(from: paraRange)!, withText: "\n")
                 return false
             }
 
-            // Insert newline + next number
-            let insert = "\n" + prefix
+            let insert = "\n\(currentNum + 1). "
             textView.replace(textView.range(from: range)!, withText: insert)
             return false
         }
 
-        // 5️⃣ Not a list line → default behavior
         return true
     }
+
 
 }
 
