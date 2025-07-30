@@ -161,6 +161,10 @@ public class RichTextEditorView: UIView {
         return nil
     }
     
+    public func currentCharacterCount() -> Int {
+        return textView.text.count
+    }
+    
     public func getXHTML() -> String? {
         guard var html = getBodyOnlyHTML() else { return nil }
 
