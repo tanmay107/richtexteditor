@@ -408,14 +408,18 @@ extension RichTextEditorView: UITextViewDelegate {
         if let currentText = textView.text,
            let textRange = Range(range, in: currentText) {
 
+            let isDeleting = text.isEmpty && range.length > 0
             let updatedText = currentText.replacingCharacters(in: textRange, with: text)
 
-            if let limit = maxCharacterCount, updatedText.count > limit {
-                return false
+            if let limit = maxCharacterCount,
+               updatedText.count > limit,
+               !isDeleting {
+                return false  // allow deletions, block only over-limit insertions
             }
 
             wordCountChangedHandler?(updatedText.count)
         }
+
 
 
         // ✅ Keep list handling logic (Return key)
