@@ -365,9 +365,28 @@ public class RichTextEditorView: UIView {
 
     public func applyLink(_ url: URL) {
         let nsRange = textView.selectedRange
-        textView.textStorage.addAttribute(.link, value: url, range: nsRange)
+
+        if nsRange.length > 0 {
+            // 🔗 Apply link to selected text
+            textView.textStorage.addAttribute(.link, value: url, range: nsRange)
+        } else {
+            // ✍️ No selection — insert visible linked text
+            let linkText = url.absoluteString
+            let attributes: [NSAttributedString.Key: Any] = [
+                .link: url,
+                .font: textView.typingAttributes[.font] ?? UIFont.systemFont(ofSize: 16),
+                .foregroundColor: textView.typingAttributes[.foregroundColor] ?? UIColor.systemBlue
+            ]
+            let attrString = NSAttributedString(string: linkText, attributes: attributes)
+
+            textView.textStorage.insert(attrString, at: nsRange.location)
+            textView.selectedRange = NSRange(location: nsRange.location + linkText.count, length: 0)
+        }
+
+        // ⚠️ Update typing attributes too
         textView.typingAttributes[.link] = url
     }
+
 
     public func removeLink() {
         let nsRange = textView.selectedRange
